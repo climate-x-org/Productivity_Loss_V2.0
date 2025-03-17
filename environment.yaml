@@ -1,0 +1,25 @@
+name: productivity_loss_v2
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - numpy
+  - pandas
+  - xarray
+  - dask
+  - matplotlib
+  - seaborn
+  - cartopy
+  - geopandas
+  - shapely
+  - scipy
+  - netCDF4
+  - rasterio
+  - tqdm
+
+  # Development & utilities
+  - jupyter
+  - jupyterlab
+  - ipykernel
