@@ -21,11 +21,6 @@ Once configured, setup the environment by running the following code in the term
 ```
 conda env create -f environment.yaml
 conda activate productivity_loss_v2
-DOMAIN=climatex-science
-ACCOUNT_ID=043302440588
-AUTH_TOKEN=$(aws codeartifact get-authorization-token --domain $DOMAIN --domain-owner $ACCOUNT_ID --query authorizationToken --output text)
-CLIX_VERSION=0.14.2
-pip install --index-url https://aws:$AUTH_TOKEN@climatex-science-043302440588.d.codeartifact.eu-west-2.amazonaws.com/pypi/clix/simple/ --extra-index-url=https://pypi.org/simple clix==$CLIX_VERSION
 ```
 
 ### 📁 Input Requirements

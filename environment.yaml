@@ -18,7 +18,8 @@ dependencies:
   - netCDF4
   - rasterio
   - tqdm
-
+  - s3fs
+  - zarr
   # Development & utilities
   - jupyter
   - jupyterlab
