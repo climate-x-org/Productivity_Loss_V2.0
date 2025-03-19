@@ -2,16 +2,15 @@
 
 ## 📌 Overview
 
-This repository provides a sample implementation of the Climate × Heat Productivity Loss Model (v2), designed for Product and Sales Engineers. Users can run the model to estimate productivity loss (%) due to heat exposure based on climate conditions and asset-specific characteristics.
+This repository provides an interface to sample the Climate × Heat Productivity Loss Model (v2), designed for Product and Sales Engineers. Users can run the model to estimate productivity loss (%) due to heat exposure based on climate conditions and asset-specific characteristics.
 
 ## 🚀 How It Works
-	1.	Upload a CSV file containing asset locations and building types/uses.
-	2.	The model applies the default HOTHAPS loss curve to compute productivity loss (%).
-	3.	Retrieve results showing productivity impacts across different assets.
+	1.	Upload a CSV file containing asset locations and building types/uses to the `/data` folder.
+	2.	Run the command-line script `./run.sh` with parameters of your chosing (see below).
+	3.	Retrieve results showing productivity impacts across different assets (csvs and figures, if you so desire).
 
 ### ⚙️ Environment Setup
-
-Before you run the script, you MUST to set up a custom Conda environment. You first need to make sure you have access to the relevant S3 buckets and setup aws configuration on your machine. To do so, run the following in you terminal:
+Before you run the script, you MUST to set up a custom Conda environment. You first need to make sure you have access to the relevant S3 buckets and setup aws configuration on your machine. If you don't have access to the `hazard-science-data` S3 bnucket, contact Monisha!! Once you've got access, run the following in you terminal and follow the prompts:
 ```
 aws configure
 ```
@@ -23,23 +22,64 @@ conda env create -f environment.yaml
 conda activate productivity_loss_v2
 ```
 
+### Running the script
+This repository contains a shell script that serves as the entry point for ssampling the Productivity Loss Model. The script allows you to customize the execution by specifying an input file, loss function, whether to generate plots, a list of scenarios, and a project name.
+
+**MINIMUM WORKING EXAMPLE**:
+To run the script with the default parameters:
+```
+./run.sh
+```
+
+To run the script with custom parameters:
+```
+./run.sh --input data/my_assets.csv --loss-function HOTHAPS --make-plots True --scenarios SSP126,SSP585 --project my_project_name
+```
+
+Default Parameter Values
+- Input File: data/test_assets.csv
+- Loss Function: HOTHAPS
+- Generate Plots: False
+- Scenarios: SSP126,SSP245,SSP370,SSP585
+- Project Name: test
+
+Command-Line Arguments
+- `--input`: Path to the input CSV file containing asset data.
+- `--loss-function`: The loss function to use (e.g., HOTHAPS).
+- `--make-plots`: Set to True or False to generate plots. The plots randomly select a subsample of the assets run for visualisation.
+- `--scenarios`: A comma-separated list of scenarios (e.g., SSP126,SSP245,SSP370,SSP585).
+- `--project`: Project name identifier (used in outputs).
+
+
+File Structure:
+- Input Data: The default input CSV file (data/test_assets.csv) should exist, or you can supply an alternative via the --input parameter.
+- Main Script: The model’s Python code is all in src/main.py.
+- Output Files: Output CSV files will be generated in the /output_csvs/ directory.
+- Figures: Optional "sense check" figures can be generated and will be saved as pngs in /figures/
+
 ### 📁 Input Requirements
-	•	CSV File Format with asset locations and building types.
-	•	Ensure latitude and longitude columns are included.
+The following columns must be included in the input csv:
+- "asset_id"
+- "latitude"
+- "longitude"
+- "asset_type"
 
 ### 📤 Output
-	•	Productivity loss (%) estimates for each asset, calculated using the HOTHAPS default loss curve.
+The main output is Productivity loss (%) estimates for each asset, calculated using the selected loss function (HOTHAPS by default). Optional output of figures.
 
-### 🔗 Next Steps
-	•	Upload sample data and test the model.
-	•	Modify parameters if needed for custom productivity loss curves.
-	•	Extend functionality for additional climate scenarios.
+The output csvs are:
+- `output_csvs/{project}_Productivity_Loss_UNSCALED` (where {project} is the project name you give) -- this is the table of productivity losses (in annual %) without any air conditioning scaling. The column 'work_intensity' tells you which loss curve intensity level has been used.
+- `output_csvs/{project}_Productivity_Loss_AC_SCALED` -- this is the same as unscaled, but each value has been multiplied by 1-AC ownership% for each asset's region. The AC ownership % is taken from Falchetta et al., 2024 and reflects residential ownership of AC in 2020. The AC % is given as the column `AC_penetration` 
+
 
 For questions, please reach out to the Science team (Aidan / Sally) 🚀
 
 
 # Appendix
 ## Assignment of asset work intensities
+**There is a file called `asset_map.csv` which contains the mapping between Spectra/Carta building use types and work intensity levels (low, moderate, or high). Feel free to change these in the file and they will automatically be updated in the script.**
+
+### Justification/method to the current assignment:
 Various industry standards and research studies classify work intensity levels by typical metabolic power output (Watts). Across occupational health guidelines and energy/climate reports, there is consistent grouping into three broad categories: roughly 200 W for light office work, 300 W for moderately active work, and 400 W for heavy industrial work. Below is a summary of each category and the relevant citation/source:
 
 ### Low Intensity (~200 W) – Office/Clerical Work

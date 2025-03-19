@@ -6,7 +6,10 @@ import numpy as np
 import argparse
 import pandas as pd
 import os
-# from src.visualisation import generate_figures
+import random
+import matplotlib.pyplot as plt
+
+import time
 
 
 def load_input_data(file_path):
@@ -27,9 +30,82 @@ def save_output_data(df, file_path):
     print(f";-) Results saved to: {file_path}")
 
 
-def main(input_file, loss_function, save_figures, scenarios):
+def barplots(df_long_scaled, scenarios, project):
+    # Select 25 random asset_ids from the entire long-format DataFrame
+    sample_ids = random.sample(list(df_long_scaled["asset_id"].unique()), 25)
+
+    # Create a subplot with one row per scenario
+    f, ax = plt.subplots(
+        len(scenarios), 1, figsize=(10, 3 * len(scenarios)), sharex=True
+    )
+
+    for i, scenario in enumerate(scenarios):
+        # Filter for the current scenario, the sampled asset_ids, and only the years 2025 and 2100.
+        data = df_long_scaled[
+            (df_long_scaled["scenario"] == scenario)
+            & (df_long_scaled["asset_id"].isin(sample_ids))
+            & (df_long_scaled["year"].isin([2025, 2100]))
+        ].copy()
+
+        # Pivot so each asset_id is one row, and columns become "2025_median", "2025_minimum", etc.
+        data_pivot = data.pivot(
+            index="asset_id", columns="year", values=["median", "minimum", "maximum"]
+        )
+        # Flatten the MultiIndex columns to single strings.
+        data_pivot.columns = [f"{year}_{stat}" for stat, year in data_pivot.columns]
+        data_pivot = data_pivot.reset_index()
+
+        # Define x-axis positions for each asset.
+        x = np.arange(len(data_pivot))
+
+        # Define error bars for 2025 and 2100.
+        err_2025 = [
+            np.abs(data_pivot["2025_median"] - data_pivot["2025_minimum"]),
+            np.abs(data_pivot["2025_maximum"] - data_pivot["2025_median"]),
+        ]
+        err_2100 = [
+            np.abs(data_pivot["2100_median"] - data_pivot["2100_minimum"]),
+            np.abs(data_pivot["2100_maximum"] - data_pivot["2100_median"]),
+        ]
+
+        bar_width = 0.4
+        # Select the appropriate axis handle.
+        a = ax[i] if len(scenarios) > 1 else ax
+
+        # Plot bars with error bars for both years.
+        a.bar(
+            x - bar_width / 2,
+            data_pivot["2025_median"],
+            yerr=err_2025,
+            width=bar_width,
+            capsize=5,
+            label="2020",
+            color="xkcd:grey",
+        )
+        a.bar(
+            x + bar_width / 2,
+            data_pivot["2100_median"],
+            yerr=err_2100,
+            width=bar_width,
+            capsize=5,
+            label="2100",
+            color="xkcd:black",
+        )
+
+        a.set_xticks(x)
+        a.set_xticklabels(data_pivot["asset_id"], rotation=45, fontsize=6, ha="right")
+        a.set_ylim(0.01, 100)
+        a.set_yscale("log")
+        a.set_ylabel("Productivity Loss (%)")
+        a.legend()
+        a.set_title(scenario)
+
+    plt.savefig(f"figures/{project}_barplots.png", dpi=300, bbox_inches="tight")
+
+
+def main(input_file, loss_function, save_figures, scenarios, project):
     ####### deal with files
-    asset_map = pd.read_csv("../src/asset_map.csv")  # load asset mapping
+    asset_map = pd.read_csv("src/asset_map.csv")  # load asset mapping
     df_in = load_input_data(input_file)  # Load input CSV
 
     ## load aircon
@@ -40,7 +116,13 @@ def main(input_file, loss_function, save_figures, scenarios):
 
     ## load loss zarrs
     ds_dict = {}
-    for scenario in ["ssp126", "ssp245", "ssp370", "ssp585"]:
+    ds_2020 = {}
+    for intensity in ["low", "moderate", "high"]:
+        ds_2020[intensity] = xr.open_zarr(
+            f"s3://hazard-science-data/productivity_loss_v2/climate_outputs/observations/ERA5_{loss_function}_productivity_loss_{intensity}.zarr.zarr/"
+        )
+
+    for scenario in scenarios:
         ds_dict[scenario] = {}
         for intensity in ["low", "moderate", "high"]:
             ds_dict[scenario][intensity] = xr.open_zarr(
@@ -48,79 +130,97 @@ def main(input_file, loss_function, save_figures, scenarios):
             )
 
     ######## sample the dataset
-    df_out = {}
+
+    # List to accumulate all rows (one per asset_id, year, scenario)
+    rows_list = []
+
     for scenario in scenarios:
-        df_out[scenario] = df_in.copy(deep=True).set_index("asset_id")
-        df_out[scenario]["work_intensity"] = df_out[scenario]["asset_type"].map(
-            asset_map.set_index("asset_type").to_dict()["intensity"]
+        # Create a temporary copy of your asset data and map work_intensity
+        df_temp = df_in.copy(deep=True)
+        df_temp["work_intensity"] = df_temp["asset_type"].map(
+            asset_map.set_index("asset_type")["intensity"]
         )
-        df_out[scenario] = df_out[scenario].reset_index()
 
-    def extract_values(row):
-        """Fetches nearest productivity loss values for given lat, lon, and work intensity."""
-        ds = ds_dict["ssp126"][row["work_intensity"]]
-        result = {
-            f"{year}_{stat}": np.round(
-                ds.sel(lat=row["lat"], lon=row["lon"], year=year, method="nearest")[
-                    stat
-                ].values,
-                4,
+        # Get the years available for this scenario.
+        # Here, we assume the years are the same for every asset in a scenario.
+        years = np.concat([[2020], ds_dict[scenario]["high"].year.values])
+        stats = ["median", "minimum", "maximum"]
+
+        # Process each asset row
+        for _, row in df_temp.iterrows():
+            # Get the dataset corresponding to the asset's work intensity in the current scenario
+            ds = ds_dict[scenario][row["work_intensity"]]
+            ds_2020_local = ds_2020[row["work_intensity"]].sel(
+                lat=row["lat"], lon=row["lon"], method="nearest"
             )
-            for stat in newcols
-            for year in years
-        }
-        return pd.Series(result)
 
-    for scenario in scenarios:
-        years = ds_dict[scenario]["high"].year.values
-        newcols = ["median", "minimum", "maximum"]
-        # Create new columns in one operation
-        col_names = [f"{year}_{stat}" for year in years for stat in newcols]
-        df_out[scenario] = df_out[scenario].assign(**{col: np.nan for col in col_names})
-        # apply function across all rows
-        df_out[scenario][col_names] = df_out[scenario].apply(extract_values, axis=1)
+            # For each year, extract the values for all stats and build a new row
+            for year in years:
+                row_dict = (
+                    row.to_dict()
+                )  # Copy the asset info (like asset_id, lat, lon, etc.)
+                row_dict["scenario"] = scenario
 
-        ## intermediate checkout - save unscaled results
-        df_out[scenario].set_index("asset_id").drop(
-            columns=["lat", "lon"]
-        ).transpose().to_csv(f"output_csvs/unscaled_{scenario}.csv")
+                if year == 2020:
+                    row_dict["year"] = 2020
+                    for stat in stats:
+                        value = np.round(ds_2020_local[stat].values, 2)
+                        row_dict[stat] = value
+
+                else:
+                    row_dict["year"] = year
+                    # Get each statistic value from the dataset (using nearest neighbor)
+                    for stat in stats:
+                        value = np.round(
+                            ds.sel(
+                                lat=row["lat"],
+                                lon=row["lon"],
+                                year=year,
+                                method="nearest",
+                            )[stat].values,
+                            2,
+                        )
+                        row_dict[stat] = value
+                    # Append the new row to our list
+                rows_list.append(row_dict)
+    df_long = pd.DataFrame(rows_list)
+    df_long.to_csv(f"output_csvs/{project}_Productivity_Loss_UNSCALED.csv")
 
     ### AC scaling
-    df_scaled = {}
-    for scenario in scenarios:
-        df_scaled[scenario] = df_out[scenario].copy(deep=True)
-        df_scaled[scenario]["AC_penetration"] = np.full_like(
-            df_scaled[scenario]["lat"], np.nan
-        )
-        for i in df_scaled[scenario].index:
-            df_scaled[scenario].loc[i, "AC_penetration"] = np.round(
-                aircon.sel(
-                    lat=df_scaled[scenario].loc[i, "lat"],
-                    lon=df_scaled[scenario].loc[i, "lat"],
-                    method="nearest",
-                ).values,
-                3,
-            )
-            if not pd.isna(df_scaled[scenario].loc[i, "AC_penetration"]):
-                df_scaled[scenario].iloc[i, 5:-1] *= (
-                    1 - df_scaled[scenario].iloc[i, -1]
-                )  # if ac penetration not null, multiple loss by 1 - AC%
+    # Make a deep copy of df_long so that the original remains unchanged
+    df_long_scaled = df_long.copy(deep=True)
 
-        df_out[scenario].set_index("asset_id").drop(
-            columns=["lat", "lon"]
-        ).transpose().to_csv(f"output_csvs/scaled_{scenario}.csv")
+    # Create a new column for AC_penetration and initialize with NaN
+    df_long_scaled["AC_penetration"] = np.nan
+
+    # Iterate over each row to compute AC penetration and adjust the values
+    for i in df_long_scaled.index:
+        lat = df_long_scaled.loc[i, "lat"]
+        lon = df_long_scaled.loc[i, "lon"]
+        # Compute AC_penetration using the nearest neighbor from the aircon dataset
+        ac_val = np.round(aircon.sel(lat=lat, lon=lon, method="nearest").values, 2)
+        df_long_scaled.loc[i, "AC_penetration"] = ac_val
+
+        # If a valid AC penetration value is found, scale the statistics accordingly
+        if not pd.isna(ac_val):
+            # Scale 'median', 'minimum', and 'maximum' by multiplying with (1 - AC_penetration)
+            df_long_scaled.loc[i, ["median", "minimum", "maximum"]] *= 1 - ac_val
+    df_long_scaled.to_csv(f"output_csvs/{project}_Productivity_Loss_AC_SCALED.csv")
 
     if save_figures:
         os.makedirs("figures", exist_ok=True)
-        # generate_figures(results, output_dir="figures")
+        barplots(df_long, scenarios, project)
         print("Figures saved in /figures/")
 
-    print("HeatProd sampling = complete 8-) ")
+    print(f"HeatProd sampling for Project = {project} is *complete* 8-) ")
 
 
 if __name__ == "__main__":
     # Parse command-line arguments
+    start_time = time.time()
     parser = argparse.ArgumentParser(description="Sample CX Productivity Loss model V2")
+    parser.add_argument("--project", type=str, required=True, help="Project name or ID")
+
     parser.add_argument(
         "--input", type=str, required=True, help="Path to input asset CSV file"
     )
@@ -131,17 +231,22 @@ if __name__ == "__main__":
         help="Loss function (default: HOTHAPS) (options:'HOTHAPS','ISO','NIOSH)",
     )
     parser.add_argument(
-        "--makeplots", action="store_true", help="Flag to generate and save figures"
+        "--makeplots", type=bool, help="Flag to generate and save figures"
     )
 
     parser.add_argument(
         "--scenarios",
-        type=list,
+        type=str,
         required=True,
-        help="Which scenarios do you want? Each will be returned as a separate csv",
+        help="Which scenarios do you want?",
         default=["ssp126", "ssp245", "ssp370", "ssp585"],
     )
     args = parser.parse_args()
 
+    # Convert the comma-separated string into a list
+    args.scenarios = [s.strip().lower() for s in args.scenarios.split(",")]
     # Run the model
-    main(args.input, args.loss_function, args.makeplots, args.scenarios)
+    main(args.input, args.loss_function, args.makeplots, args.scenarios, args.project)
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f"Total runtime: {elapsed_time:.2f} seconds")
