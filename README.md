@@ -4,6 +4,12 @@
 
 This repository provides an interface to sample the Climate × Heat Productivity Loss Model (v2), designed for Product and Sales Engineers. Users can run the model to estimate productivity loss (%) due to heat exposure based on climate conditions and asset-specific characteristics.
 
+- csv of assets goes in --> csv with labour productivity loss (%) due to chronic heat stress for Spectra years (2025,2030..,2100) under each SSP comes out.
+- BONUS output of a labour productivity loss csv scaled based on the probability of air conditioning availability at each asset.
+- the loss curve applied is for either "low", "moderate", or "high" intensity work. The selection depends on the asset type (see appendix below).
+- by default, this uses the HOTHAPS loss functions [info here](https://link.springer.com/article/10.1007/s41885-021-00091-6), but can be changed to use ISO and NIOSH if you want more aggressive losses.
+
+
 ## 🚀 How It Works
 	1.	Upload a CSV file containing asset locations and building types/uses to the `/data` folder.
 	2.	Run the command-line script `./run.sh` with parameters of your chosing (see below).
