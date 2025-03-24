@@ -17,9 +17,17 @@ def load_input_data(file_path):
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"Input file not found: {file_path}")
 
-    df = pd.read_csv(file_path)[["asset_id", "latitude", "longitude", "asset_type"]]
-    return df.drop_duplicates("asset_id").rename(
-        columns={"latitude": "lat", "longitude": "lon"}
+    df_in = pd.read_csv(file_path, encoding="unicode_escape")[
+        ["Asset ID", "Latitude", "Longitude", "Parent Name", "Premise Type", "Country"]
+    ]
+    return df_in.drop_duplicates("Asset ID").rename(
+        columns={
+            "Asset ID": "asset_id",
+            "Latitude": "lat",
+            "Longitude": "lon",
+            "Country": "country",
+            "Premise Type": "asset_type",
+        }
     )
 
 
@@ -131,8 +139,9 @@ def main(input_file, loss_function, save_figures, scenarios, project):
 
     ######## sample the dataset
 
-    # List to accumulate all rows (one per asset_id, year, scenario)
-    rows_list = []
+    # List to accumulate DataFrames from each scenario and each work_intensity group
+    df_list = []
+    stats = ["median", "minimum", "maximum"]
 
     for scenario in scenarios:
         # Create a temporary copy of your asset data and map work_intensity
@@ -141,50 +150,50 @@ def main(input_file, loss_function, save_figures, scenarios, project):
             asset_map.set_index("asset_type")["intensity"]
         )
 
-        # Get the years available for this scenario.
-        # Here, we assume the years are the same for every asset in a scenario.
-        years = np.concat([[2020], ds_dict[scenario]["high"].year.values])
-        stats = ["median", "minimum", "maximum"]
+        # Get the years available for this scenario (2020 + projection years)
+        years_all = np.concatenate(([2020], ds_dict[scenario]["high"].year.values))
+        proj_years = years_all[1:]  # projection years (excluding 2020)
 
-        # Process each asset row
-        for _, row in df_temp.iterrows():
-            # Get the dataset corresponding to the asset's work intensity in the current scenario
-            ds = ds_dict[scenario][row["work_intensity"]]
-            ds_2020_local = ds_2020[row["work_intensity"]].sel(
-                lat=row["lat"], lon=row["lon"], method="nearest"
-            )
+        # process by grouping assets according to their work intensity
+        for intensity, group in df_temp.groupby("work_intensity"):
+            # Prepare vectorized coordinate arrays for the group
+            lat_da = xr.DataArray(group["lat"].values, dims="asset")
+            lon_da = xr.DataArray(group["lon"].values, dims="asset")
 
-            # For each year, extract the values for all stats and build a new row
-            for year in years:
-                row_dict = (
-                    row.to_dict()
-                )  # Copy the asset info (like asset_id, lat, lon, etc.)
-                row_dict["scenario"] = scenario
+            # --- Process year 2020 using the observation dataset ---
+            ds_obs = ds_2020[intensity].sel(lat=lat_da, lon=lon_da, method="nearest")
+            df_2020 = group.copy()
+            df_2020["year"] = 2020
+            for stat in stats:
+                df_2020[stat] = np.round(ds_obs[stat].values, 2)
+            df_2020["scenario"] = scenario
+            df_list.append(df_2020)
 
-                if year == 2020:
-                    row_dict["year"] = 2020
-                    for stat in stats:
-                        value = np.round(ds_2020_local[stat].values, 2)
-                        row_dict[stat] = value
+            # --- Process projection years using the scenario dataset ---
+            if len(proj_years) > 0:
+                years_da = xr.DataArray(proj_years, dims="year")
+                ds_proj = ds_dict[scenario][intensity].sel(
+                    lat=lat_da, lon=lon_da, year=years_da, method="nearest"
+                )
+                # ds_proj[stat] now has dimensions ("year", "asset")
+                n_assets = group.shape[0]
+                n_years = len(proj_years)
 
-                else:
-                    row_dict["year"] = year
-                    # Get each statistic value from the dataset (using nearest neighbor)
-                    for stat in stats:
-                        value = np.round(
-                            ds.sel(
-                                lat=row["lat"],
-                                lon=row["lon"],
-                                year=year,
-                                method="nearest",
-                            )[stat].values,
-                            2,
-                        )
-                        row_dict[stat] = value
-                    # Append the new row to our list
-                rows_list.append(row_dict)
-    df_long = pd.DataFrame(rows_list)
-    df_long.to_csv(f"output_csvs/{project}_Productivity_Loss_UNSCALED.csv")
+                data_stats = {}
+                for stat in stats:
+                    # ds_proj[stat].values: shape (n_years, n_assets) -> transpose to (n_assets, n_years)
+                    data_stats[stat] = np.round(ds_proj[stat].values.T.flatten(), 2)
+
+                df_proj = group.loc[group.index.repeat(n_years)].reset_index(drop=True)
+                df_proj["year"] = np.tile(proj_years, n_assets)
+                for stat in stats:
+                    df_proj[stat] = data_stats[stat]
+                df_proj["scenario"] = scenario
+                df_list.append(df_proj)
+
+    # Combine the list of DataFrames into a single long-format DataFrame.
+    df_long = pd.concat(df_list, ignore_index=True)
+    df_long.to_csv(f"output_csvs/{project}_Productivity_Loss_UNSCALED.csv", index=False)
 
     ### AC scaling
     # Make a deep copy of df_long so that the original remains unchanged
@@ -205,6 +214,9 @@ def main(input_file, loss_function, save_figures, scenarios, project):
         if not pd.isna(ac_val):
             # Scale 'median', 'minimum', and 'maximum' by multiplying with (1 - AC_penetration)
             df_long_scaled.loc[i, ["median", "minimum", "maximum"]] *= 1 - ac_val
+
+    for col in ["median", "minimum", "maximum"]:
+        df_long_scaled[col] = np.round(df_long_scaled[col], 2)
     df_long_scaled.to_csv(f"output_csvs/{project}_Productivity_Loss_AC_SCALED.csv")
 
     if save_figures:
