@@ -17,25 +17,37 @@ def load_input_data(file_path):
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"Input file not found: {file_path}")
 
-    df_in = pd.read_csv(file_path, encoding="unicode_escape")[
-        ["Asset ID", "Latitude", "Longitude", "Parent Name", "Premise Type", "Country"]
-    ]
-    return df_in.drop_duplicates("Asset ID").rename(
-        columns={
-            "Asset ID": "asset_id",
-            "Latitude": "lat",
-            "Longitude": "lon",
-            "Country": "country",
-            "Premise Type": "asset_type",
-        }
-    )
+    df_in = pd.read_csv(file_path, encoding="unicode_escape")
 
+    # mapping: standardised name -> list of acceptable alternative names
+    column_aliases = {
+        "asset_id": ["Asset ID", "asset id", "AssetID", "assetid"],
+        "lat": ["Latitude", "latitude", "Lat", "lat"],
+        "lon": ["Longitude", "longitude", "Lon", "lon"],
+        "parent_name": ["Parent Name", "parent name", "Parent"],
+        "asset_type": ["Premise Type", "premise type", "Asset Type", "asset type"],
+        "country": ["Country", "country"],
+    }
 
-def save_output_data(df, file_path):
-    """Save productivity loss results to a CSV file."""
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
-    df.to_csv(file_path, index=False)
-    print(f";-) Results saved to: {file_path}")
+    # Build a rename map based on which alternatives are present in the file.
+    rename_map = {}
+    for std_col, alternatives in column_aliases.items():
+        found = None
+        for alt in alternatives:
+            if alt in df_in.columns:
+                found = alt
+                break
+        if found is None:
+            raise ValueError(
+                f"Required column for '{std_col}' not found in input file. Alternatives: {alternatives}"
+            )
+        rename_map[found] = std_col
+
+    # Keep only the required columns and rename them.
+    df_in = df_in[list(rename_map.keys())].copy(deep=True)
+    df_in = df_in.rename(columns=rename_map)
+
+    return df_in.drop_duplicates("asset_id")
 
 
 def barplots(df_long_scaled, scenarios, project):
@@ -193,7 +205,22 @@ def main(input_file, loss_function, save_figures, scenarios, project):
 
     # Combine the list of DataFrames into a single long-format DataFrame.
     df_long = pd.concat(df_list, ignore_index=True)
-    df_long.to_csv(f"output_csvs/{project}_Productivity_Loss_UNSCALED.csv", index=False)
+    df_long.rename(
+        columns={
+            "asset_id": "Asset ID",
+            "lat": "Lat",
+            "lon": "Lon",
+            "asset_type": "Asset Type",
+            "country": "Country",
+            "parent_name": "Parent Name",
+            "work_intensity": "Work Intensity",
+            "year": "Year",
+            "scenario": "Scenario",
+            "median": "Median Productivity Reduction %",
+            "minimum": "10th Percentile Productivity Reduction %",
+            "maximum": "90th Percentile Productivity Reduction %",
+        }
+    ).to_csv(f"output_csvs/{project}_Productivity_Loss_UNSCALED.csv", index=False)
 
     ### AC scaling
     # Make a deep copy of df_long so that the original remains unchanged
@@ -217,7 +244,22 @@ def main(input_file, loss_function, save_figures, scenarios, project):
 
     for col in ["median", "minimum", "maximum"]:
         df_long_scaled[col] = np.round(df_long_scaled[col], 2)
-    df_long_scaled.to_csv(f"output_csvs/{project}_Productivity_Loss_AC_SCALED.csv")
+    df_long_scaled.rename(
+        columns={
+            "asset_id": "Asset ID",
+            "lat": "Lat",
+            "lon": "Lon",
+            "asset_type": "Asset Type",
+            "country": "Country",
+            "work_intensity": "Work Intensity",
+            "year": "Year",
+            "parent_name": "Parent Name",
+            "scenario": "Scenario",
+            "median": "Median Productivity Reduction %",
+            "minimum": "10th Percentile Productivity Reduction %",
+            "maximum": "90th Percentile Productivity Reduction %",
+        }
+    ).to_csv(f"output_csvs/{project}_Productivity_Loss_AC_SCALED.csv")
 
     if save_figures:
         os.makedirs("figures", exist_ok=True)

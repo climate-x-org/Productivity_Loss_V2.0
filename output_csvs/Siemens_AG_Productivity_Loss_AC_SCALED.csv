@@ -1,4 +1,4 @@
-,asset_id,lat,lon,Parent Name,asset_type,country,work_intensity,year,median,minimum,maximum,scenario,AC_penetration
+,Asset ID,Lat,Lon,Parent Name,Asset Type,Country,Work Intensity,Year,Median Productivity Reduction %,10th Percentile Productivity Reduction %,90th Percentile Productivity Reduction %,Scenario,AC_penetration
 0,1_SIEMENS-ENERGY-AG,51.4418385,6.8808479,Siemens Energy AG,INDUSTRIAL,Germany,high,2020,0.02,0.01,0.03,ssp585,0.15000000596046448
 1,4_SIEMENS-ENERGY-AG,49.7137555,11.0723667,Siemens Energy AG,INDUSTRIAL,Germany,high,2020,0.02,0.01,0.03,ssp585,0.10999999940395355
 2,5_SIEMENS-ENERGY-AG,48.0911286,11.6527081,Siemens Energy AG,INDUSTRIAL,Germany,high,2020,0.02,0.01,0.03,ssp585,0.11999999731779099

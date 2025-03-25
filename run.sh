@@ -36,7 +36,7 @@ echo "Running Productivity Loss Model for project $PROJECT with:"
 echo "   📂 Input File: $INPUT_FILE"
 echo "   💾 Output Files: /output_csvs/"
 echo "   🔧 Loss Function: $LOSS_FUNCTION"
-echo "   🔧 Generate plots?: $MAKE_PLOTS"
+echo "   📊 Generate plots?: $MAKE_PLOTS"
 echo "   🚀 Scenarios: $SCENARIOS"
 
 python3 src/main.py --input "$INPUT_FILE" --loss-function "$LOSS_FUNCTION" --makeplots "$MAKE_PLOTS" --scenarios "$SCENARIOS" --project "$PROJECT"
