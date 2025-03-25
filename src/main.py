@@ -19,40 +19,40 @@ def load_input_data(file_path):
 
     df_in = pd.read_csv(file_path, encoding="unicode_escape")
 
-    # mapping: standardised name -> list of acceptable alternative names
-    column_aliases = {
-        "asset_id": ["Asset ID", "asset id", "AssetID", "assetid"],
-        "lat": ["Latitude", "latitude", "Lat", "lat"],
-        "lon": ["Longitude", "longitude", "Lon", "lon"],
-        "parent_name": ["Parent Name", "parent name", "Parent"],
-        "asset_type": ["Premise Type", "premise type", "Asset Type", "asset type"],
-        "country": ["Country", "country"],
-    }
+    # # mapping: standardised name -> list of acceptable alternative names
+    # column_aliases = {
+    #     "asset_id": ["Asset ID", "asset id", "AssetID", "assetid"],
+    #     "lat": ["Latitude", "latitude", "Lat", "lat"],
+    #     "lon": ["Longitude", "longitude", "Lon", "lon"],
+    #     "parent_name": ["Parent Name", "parent name", "Parent"],
+    #     "asset_type": ["Premise Type", "premise type", "Asset Type", "asset type"],
+    #     "country": ["Country", "country"],
+    # }
 
-    # Build a rename map based on which alternatives are present in the file.
-    rename_map = {}
-    for std_col, alternatives in column_aliases.items():
-        found = None
-        for alt in alternatives:
-            if alt in df_in.columns:
-                found = alt
-                break
-        if found is None:
-            raise ValueError(
-                f"Required column for '{std_col}' not found in input file. Alternatives: {alternatives}"
-            )
-        rename_map[found] = std_col
+    # # Build a rename map based on which alternatives are present in the file.
+    # rename_map = {}
+    # for std_col, alternatives in column_aliases.items():
+    #     found = None
+    #     for alt in alternatives:
+    #         if alt in df_in.columns:
+    #             found = alt
+    #             break
+    #     if found is None:
+    #         raise ValueError(
+    #             f"Required column for '{std_col}' not found in input file. Alternatives: {alternatives}"
+    #         )
+    #     rename_map[found] = std_col
 
     # Keep only the required columns and rename them.
-    df_in = df_in[list(rename_map.keys())].copy(deep=True)
-    df_in = df_in.rename(columns=rename_map)
+    # df_in = df_in[list(rename_map.keys())].copy(deep=True)
+    # df_in = df_in.rename(columns=rename_map)
 
-    return df_in.drop_duplicates("asset_id")
+    return df_in.drop_duplicates("Asset ID")
 
 
 def barplots(df_long_scaled, scenarios, project):
     # Select 25 random asset_ids from the entire long-format DataFrame
-    sample_ids = random.sample(list(df_long_scaled["asset_id"].unique()), 25)
+    sample_ids = random.sample(list(df_long_scaled["Asset ID"].unique()), 25)
 
     # Create a subplot with one row per scenario
     f, ax = plt.subplots(
@@ -62,14 +62,14 @@ def barplots(df_long_scaled, scenarios, project):
     for i, scenario in enumerate(scenarios):
         # Filter for the current scenario, the sampled asset_ids, and only the years 2025 and 2100.
         data = df_long_scaled[
-            (df_long_scaled["scenario"] == scenario)
-            & (df_long_scaled["asset_id"].isin(sample_ids))
-            & (df_long_scaled["year"].isin([2025, 2100]))
+            (df_long_scaled["Scenario"] == scenario)
+            & (df_long_scaled["Asset ID"].isin(sample_ids))
+            & (df_long_scaled["Year"].isin([2025, 2100]))
         ].copy()
 
         # Pivot so each asset_id is one row, and columns become "2025_median", "2025_minimum", etc.
         data_pivot = data.pivot(
-            index="asset_id", columns="year", values=["median", "minimum", "maximum"]
+            index="Asset ID", columns="Year", values=["median", "minimum", "maximum"]
         )
         # Flatten the MultiIndex columns to single strings.
         data_pivot.columns = [f"{year}_{stat}" for stat, year in data_pivot.columns]
@@ -113,7 +113,7 @@ def barplots(df_long_scaled, scenarios, project):
         )
 
         a.set_xticks(x)
-        a.set_xticklabels(data_pivot["asset_id"], rotation=45, fontsize=6, ha="right")
+        a.set_xticklabels(data_pivot["Asset ID"], rotation=45, fontsize=6, ha="right")
         a.set_ylim(0.01, 100)
         a.set_yscale("log")
         a.set_ylabel("Productivity Loss (%)")
@@ -158,7 +158,7 @@ def main(input_file, loss_function, save_figures, scenarios, project):
     for scenario in scenarios:
         # Create a temporary copy of your asset data and map work_intensity
         df_temp = df_in.copy(deep=True)
-        df_temp["work_intensity"] = df_temp["asset_type"].map(
+        df_temp["Work Intensity"] = df_temp["Premise Type"].map(
             asset_map.set_index("asset_type")["intensity"]
         )
 
@@ -167,18 +167,18 @@ def main(input_file, loss_function, save_figures, scenarios, project):
         proj_years = years_all[1:]  # projection years (excluding 2020)
 
         # process by grouping assets according to their work intensity
-        for intensity, group in df_temp.groupby("work_intensity"):
+        for intensity, group in df_temp.groupby("Work Intensity"):
             # Prepare vectorized coordinate arrays for the group
-            lat_da = xr.DataArray(group["lat"].values, dims="asset")
-            lon_da = xr.DataArray(group["lon"].values, dims="asset")
+            lat_da = xr.DataArray(group["Latitude"].values, dims="asset")
+            lon_da = xr.DataArray(group["Longitude"].values, dims="asset")
 
             # --- Process year 2020 using the observation dataset ---
             ds_obs = ds_2020[intensity].sel(lat=lat_da, lon=lon_da, method="nearest")
             df_2020 = group.copy()
-            df_2020["year"] = 2020
+            df_2020["Year"] = 2020
             for stat in stats:
                 df_2020[stat] = np.round(ds_obs[stat].values, 2)
-            df_2020["scenario"] = scenario
+            df_2020["Scenario"] = scenario
             df_list.append(df_2020)
 
             # --- Process projection years using the scenario dataset ---
@@ -197,25 +197,16 @@ def main(input_file, loss_function, save_figures, scenarios, project):
                     data_stats[stat] = np.round(ds_proj[stat].values.T.flatten(), 2)
 
                 df_proj = group.loc[group.index.repeat(n_years)].reset_index(drop=True)
-                df_proj["year"] = np.tile(proj_years, n_assets)
+                df_proj["Year"] = np.tile(proj_years, n_assets)
                 for stat in stats:
                     df_proj[stat] = data_stats[stat]
-                df_proj["scenario"] = scenario
+                df_proj["Scenario"] = scenario
                 df_list.append(df_proj)
 
     # Combine the list of DataFrames into a single long-format DataFrame.
     df_long = pd.concat(df_list, ignore_index=True)
     df_long.rename(
         columns={
-            "asset_id": "Asset ID",
-            "lat": "Lat",
-            "lon": "Lon",
-            "asset_type": "Asset Type",
-            "country": "Country",
-            "parent_name": "Parent Name",
-            "work_intensity": "Work Intensity",
-            "year": "Year",
-            "scenario": "Scenario",
             "median": "Median Productivity Reduction %",
             "minimum": "10th Percentile Productivity Reduction %",
             "maximum": "90th Percentile Productivity Reduction %",
@@ -227,15 +218,15 @@ def main(input_file, loss_function, save_figures, scenarios, project):
     df_long_scaled = df_long.copy(deep=True)
 
     # Create a new column for AC_penetration and initialize with NaN
-    df_long_scaled["AC_penetration"] = np.nan
+    df_long_scaled["AC penetration"] = np.nan
 
     # Iterate over each row to compute AC penetration and adjust the values
     for i in df_long_scaled.index:
-        lat = df_long_scaled.loc[i, "lat"]
-        lon = df_long_scaled.loc[i, "lon"]
+        lat = df_long_scaled.loc[i, "Latitude"]
+        lon = df_long_scaled.loc[i, "Longitude"]
         # Compute AC_penetration using the nearest neighbor from the aircon dataset
         ac_val = np.round(aircon.sel(lat=lat, lon=lon, method="nearest").values, 2)
-        df_long_scaled.loc[i, "AC_penetration"] = ac_val
+        df_long_scaled.loc[i, "AC penetration"] = ac_val
 
         # If a valid AC penetration value is found, scale the statistics accordingly
         if not pd.isna(ac_val):
@@ -246,15 +237,6 @@ def main(input_file, loss_function, save_figures, scenarios, project):
         df_long_scaled[col] = np.round(df_long_scaled[col], 2)
     df_long_scaled.rename(
         columns={
-            "asset_id": "Asset ID",
-            "lat": "Lat",
-            "lon": "Lon",
-            "asset_type": "Asset Type",
-            "country": "Country",
-            "work_intensity": "Work Intensity",
-            "year": "Year",
-            "parent_name": "Parent Name",
-            "scenario": "Scenario",
             "median": "Median Productivity Reduction %",
             "minimum": "10th Percentile Productivity Reduction %",
             "maximum": "90th Percentile Productivity Reduction %",
