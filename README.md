@@ -1,4 +1,4 @@
-# Climate × Heat Productivity Loss Model (v2)
+# Climate X Heat Productivity Loss Model v2.0
 
 This repository provides a sample interface for estimating annual productivity loss (%) due to heat exposure based on climate conditions and asset-specific data.
 
@@ -43,8 +43,8 @@ This repository provides a sample interface for estimating annual productivity l
     ```bash
     ./run.sh --input data/{YOUR_FILE.csv} --scenarios SSP126,SSP585 --project {YOUR_PROJECT_NAME}
     ```
-    > [!NOTE]  
-    > You may need to run `chmod +x run.sh` before the shell script can run
+> [!NOTE]  
+> You may need to run `chmod +x run.sh` before the shell script can run
 
 6. **Review Outputs:**
 
