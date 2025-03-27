@@ -11,42 +11,18 @@ import matplotlib.pyplot as plt
 
 import time
 
+from src import validation
+
 
 def load_input_data(file_path):
     """Load asset data from CSV file."""
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"Input file not found: {file_path}")
-
-    df_in = pd.read_csv(file_path, encoding="unicode_escape")
-
-    # # mapping: standardised name -> list of acceptable alternative names
-    # column_aliases = {
-    #     "asset_id": ["Asset ID", "asset id", "AssetID", "assetid"],
-    #     "lat": ["Latitude", "latitude", "Lat", "lat"],
-    #     "lon": ["Longitude", "longitude", "Lon", "lon"],
-    #     "parent_name": ["Parent Name", "parent name", "Parent"],
-    #     "asset_type": ["Premise Type", "premise type", "Asset Type", "asset type"],
-    #     "country": ["Country", "country"],
-    # }
-
-    # # Build a rename map based on which alternatives are present in the file.
-    # rename_map = {}
-    # for std_col, alternatives in column_aliases.items():
-    #     found = None
-    #     for alt in alternatives:
-    #         if alt in df_in.columns:
-    #             found = alt
-    #             break
-    #     if found is None:
-    #         raise ValueError(
-    #             f"Required column for '{std_col}' not found in input file. Alternatives: {alternatives}"
-    #         )
-    #     rename_map[found] = std_col
-
-    # Keep only the required columns and rename them.
-    # df_in = df_in[list(rename_map.keys())].copy(deep=True)
-    # df_in = df_in.rename(columns=rename_map)
-
+    try:
+        df_in = validation.validate_csv(file_path)
+        print("CSV validation passed.")
+    except ValueError as e:
+        print(f"CSV validation error: {e}")
     return df_in.drop_duplicates("Asset ID")
 
 
