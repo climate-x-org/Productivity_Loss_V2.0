@@ -1,98 +1,119 @@
-# Climate × Heat Productivity Loss Model (v2) – Sample Repo
+# Climate X Heat Productivity Loss Model v2.0
+
+This repository provides a sample interface for estimating annual productivity loss (%) due to heat exposure based on climate conditions and asset-specific data.
+
+---
 
 ## 🏎️ Quickstart
-1. Clone into this repo on your local machine or instance (`git clone https://github.com/climate-x-org/Productivity_Loss_V2.0.git`)
-2. Make sure you have AWS permissions configured (`aws configure` in the command line - Talk to Monisha if you need a secret access key and permission to the `hazard-science-data` S3 bucket)
-3. Create the conda environment with `conda env create -f environment.yml`
-4. Activate the conda env with `conda activate productivity_loss_v2`
-4. Upload your csv of assets into the `/data/` folder (make sure your input columns match those in the file `data/siemens-energy-ag.csv` example)
-5. Run the command line interface with `./run.sh --input data/{YOUR FILE NAME} --scenarios {your scenarios in the format: SSP126,SSP585} --project {YOUR PROJECT NAME}` (there are additional optional parameters described below)
-6. See the results in the `output_csvs/` folder. There should be two files, one "unscaled" and one "scaled" for AC likelihood. 
+
+1. **Clone the Repo:**
+
+   ```bash
+   git clone https://github.com/climate-x-org/Productivity_Loss_V2.0.git
+    ```
+
+2. **AWS Setup:**
+    Configure AWS (contact Monisha for credentials if needed):
+    
+    ```bash
+    aws configure
+    ```
+
+3.	**Conda Environment:**
+    Create and activate the environment:
+    ```bash
+    conda env create -f environment.yml
+    conda activate productivity_loss_v2
+    ``` 
+
+4.	**Prepare Your Input:**
+	Place your CSV in the /data/ folder.
+	Required columns (additional columns are allowed):
+	- `Asset ID`
+	- `Parent Name`
+	- `Premise Type`
+	- `Latitude`
+	- `Longitude`
+	- `Asset Criticality`
+
+    See data/hsbc_poc_mar25_all_assets_dropped_bad_lats.csv
+
+5. **Run the script:**
+    Execute the CLI:
+    ```bash
+    ./run.sh --input data/{YOUR_FILE.csv} --scenarios SSP126,SSP585 --project {YOUR_PROJECT_NAME}
+    ```
+> [!NOTE]  
+> You may need to run `chmod +x run.sh` before the shell script can run
+
+6. **Review Outputs:**
+
+    Check the /output_csvs/ folder for two files:
+	- Unscaled: Base productivity loss estimates.
+	- AC Scaled: Loss estimates adjusted for air conditioning availability.
 
 
-## 📌 Overview
+# 📌 Overview
+- Purpose: Estimate productivity loss (%) due to heat exposure using pre-calculated global rasters.
+- Loss Functions: Default is HOTHAPS (alternatives include ISO and NIOSH).
+- Work Intensities: The loss curve applied depends on asset work type (low, moderate, or high intensity).
 
-This repository provides an interface to sample the Climate × Heat Productivity Loss Model (v2), designed for Product and Sales Engineers. Users can run the model to estimate productivity loss (%) due to heat exposure based on climate conditions and asset-specific characteristics.
-
-- csv of assets goes in --> csv with labour productivity loss (%) due to chronic heat stress for Spectra years (2025,2030..,2100) under each SSP comes out.
-- BONUS output of a labour productivity loss csv scaled based on the probability of air conditioning availability at each asset.
-- the loss curve applied is for either "low", "moderate", or "high" intensity work. The selection depends on the asset type (see appendix below).
-- by default, this uses the HOTHAPS loss functions [info here](https://link.springer.com/article/10.1007/s41885-021-00091-6), but can be changed to use ISO and NIOSH if you want more aggressive losses based on workplace regulations rather than empirical data.
-
-
-## 🚀 How It Works
-We have pre-calculated global rasters for productivity loss based on 4 CMIP6 scenarios (SSP126, SSP245, SSP370, SSP585), 3 work intensity levels (low, moderate high), 3 loss function sources (HOTHAPS, ISO, NIOSH). These losses are determined by calculating the number of working hours per year at different Wet Bulb Globe Temperature levels (a combination of dry heat and humidity). The % loss is calculated as the numnber of hours actually worked / the total possible working hours. 
-
-In other words, a 10% productivity loss suggests that of the 4380 working hours in a year (12 hours * 365 days), 438 hours were unproductive due to heat stress. We can relate this to revenue loss by assuming a 10% loss of pproductivity = a 10% loss in revenue. Alternative approaches would be to multiple the hours lost by the average hourly wage of workers in a given sector, but we don't currently implement this. 
-
-### ⚙️ Environment Setup
-Before you run the script, you MUST to set up a custom Conda environment. You first need to make sure you have access to the relevant S3 buckets and setup aws configuration on your machine. If you don't have access to the `hazard-science-data` S3 bnucket, contact Monisha!! Once you've got access, run the following in you terminal and follow the prompts:
-```
-aws configure
-```
-
-Once configured, you can build the conda environment by running the following code in the terminal:
-
-```
-conda env create -f environment.yml
-```
-
-> [!NOTE]
-> Make sure your working directory matches where the environment.yml file is found. If you try running the code and it tells you a package isn't found (e.g. `xarray not installed`) even though you've definitely activated the env, you may have to install the packages mannually (e.g. `conda install xarray`). This is a known bug that I can't explain.
+# 🚀 How It Works
+1. Input: CSV with asset data (must include required columns).
+2. Processing:
+3. Applies loss functions based on climate scenarios (e.g., SSP126, SSP245, SSP370, SSP585) and work intensity.
+4. Optionally generates plots for a subsample of assets.
+5. Output:
+    - Two CSV files with productivity loss estimates (unscaled and AC-scaled).
 
 
-### Running the script
-This repository contains a shell script that serves as the entry point for sampling the Productivity Loss Model. The script allows you to customize the execution by specifying an input file, loss function, whether to generate plots, a list of scenarios, and a project name.
+# ⚙️ Environment & Running the Script
+- AWS: Ensure AWS permissions are configured.
+- Conda: Build the environment with:
+    ```bash
+    conda env create -f environment.yml
+    conda activate productivity_loss_v2 
+    ```
+Note: If any packages (e.g., xarray) are missing after activation, you might need to install them manually (this is a bug I'm aware of but don't understand)
 
-**MINIMUM WORKING EXAMPLE**:
-To run the script with the default parameters:
-```
-./run.sh
-```
+## CLI Arguments:
+- `--input`: Path to the input CSV (default: data/test_assets.csv).
+- `--loss-function`: Loss function to use (default: HOTHAPS).
+- `--make-plots`: Generate plots? (True/False; default: False).
+- `--scenario`s`: Comma-separated list of scenarios (default: SSP126,SSP245,SSP370,SSP585).
+- `--project`: Project name identifier (default: test).
 
-To run the script with custom parameters:
-```
-./run.sh --input data/my_assets.csv --loss-function HOTHAPS --make-plots True --scenarios SSP126,SSP585 --project my_project_name
-```
+**Example:**
+    ```
+    ./run.sh --input data/my_assets.csv --loss-function HOTHAPS --make-plots True --scenarios SSP126,SSP585 --project my_project
+    ```
 
-🍦Default Parameter Values
-- Input File: data/test_assets.csv
-- Loss Function: HOTHAPS
-- Generate Plots: False
-- Scenarios: SSP126,SSP245,SSP370,SSP585
-- Project Name: test
-
-Command-Line Arguments
-- `--input`: Path to the input CSV file containing asset data.
-- `--loss-function`: The loss function to use (e.g., HOTHAPS).
-- `--make-plots`: Set to True or False to generate plots. The plots randomly select a subsample of the assets run for visualisation.
-- `--scenarios`: A comma-separated list of scenarios (e.g., SSP126,SSP245,SSP370,SSP585).
-- `--project`: Project name identifier (used in outputs).
-
-
-File Structure:
-- Input Data: The default input CSV file (data/test_assets.csv) should exist, or you can supply an alternative via the --input parameter.
-- Main Script: The model’s Python code is all in src/main.py.
-- Output Files: Output CSV files will be generated in the /output_csvs/ directory.
-- Figures: Optional "sense check" figures can be generated and will be saved as pngs in /figures/
-
-### 📁 Input Requirements
-The following columns must be included in the input csv:
-- "asset_id"
-- "latitude"
-- "longitude"
-- "asset_type"
-
-### 📤 Output
-The main output is Productivity loss (%) estimates for each asset, calculated using the selected loss function (HOTHAPS by default). Optional output of figures.
-
-The output csvs are:
-- `output_csvs/{project}_Productivity_Loss_UNSCALED` (where {project} is the project name you give) -- this is the table of productivity losses (in annual %) without any air conditioning scaling. The column 'work_intensity' tells you which loss curve intensity level has been used.
-- `output_csvs/{project}_Productivity_Loss_AC_SCALED` -- this is the same as unscaled, but each value has been multiplied by 1-AC ownership% for each asset's region. The AC ownership % is taken from Falchetta et al., 2024 and reflects residential ownership of AC in 2020. The AC % is given as the column `AC_penetration` 
-
-For questions, please reach out to the Science team (Aidan / Sally) 🚀
-
+# 📁 File structure 
+```shell
+├── README.md
+├── data/                  # Input CSV files
+├── dev/                   # Development notebooks
+├── environment.yml        # Conda environment file
+├── figures/               # Generated plots
+├── output_csvs/           # Output CSVs with productivity loss estimates
+├── run.sh                 # Entry point script
+└── src/                   # Python source code
+    ├── asset_map.csv      # Asset type to work intensity mapping
+    ├── main.py            # Main processing script
+    ├── visualisation.py   # Plotting utilities
+    └── validation.py      # CSV validation functions
 ----
+```
+
+# 📤 Output
+The model produces two primary CSV outputs:
+- `{project}_Productivity_Loss_UNSCALED.csv`: Productivity loss (%) without AC adjustments.
+- `{project}_Productivity_Loss_AC_SCALED.csv`: Loss estimates scaled by regional air conditioning penetration.
+
+# 🤝 Support
+
+For any questions or issues, please contact the Science team (Aidan / Sally).
+
 # Appendix
 ## Assignment of asset work intensities
 **There is a file called `asset_map.csv` which contains the mapping between Spectra/Carta building use types and work intensity levels (low, moderate, or high). Feel free to change these in the file and they will automatically be updated in the script.**
