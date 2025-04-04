@@ -124,6 +124,9 @@ def main(input_file, loss_function, save_figures, scenarios, project):
             ds_dict[scenario][intensity] = xr.open_zarr(
                 f"s3://hazard-science-data/productivity_loss_v2/climate_outputs/projections_corrected/{scenario}/CMIP6-ScenarioMIP_{loss_function}_productivity_loss_{intensity}_{scenario}.zarr.zarr/"
             )
+            ds_dict[scenario][intensity] = (
+                ds_dict[scenario][intensity] + ds_2020[intensity]
+            )
 
     ######## sample the dataset
 

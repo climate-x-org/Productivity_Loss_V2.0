@@ -4,6 +4,10 @@ This repository provides a sample interface for estimating annual productivity l
 
 ---
 
+> [!IMPORTANT]  
+> If you plan on making changes to the source code, you MUST make a new branch and submit a pull request if you want it to be merged into the main branch. 
+
+
 ## 🏎️ Quickstart
 
 1. **Clone the Repo:**
@@ -36,14 +40,14 @@ This repository provides a sample interface for estimating annual productivity l
 	- `Longitude`
 	- `Asset Criticality`
 
-    See data/hsbc_poc_mar25_all_assets_dropped_bad_lats.csv
+    See `data/hsbc_poc_mar25_all_assets_dropped_bad_lats.csv` for an example input file.
 
 5. **Run the script:**
-    Execute the CLI:
+    Execute the CLI (add or remove the scenarios you want):
     ```bash
     ./run.sh --input data/{YOUR_FILE.csv} --scenarios SSP126,SSP585 --project {YOUR_PROJECT_NAME}
     ```
-> [!NOTE]  
+> [!WARNING]  
 > You may need to run `chmod +x run.sh` before the shell script can run
 
 6. **Review Outputs:**
@@ -51,7 +55,9 @@ This repository provides a sample interface for estimating annual productivity l
     Check the /output_csvs/ folder for two files:
 	- Unscaled: Base productivity loss estimates.
 	- AC Scaled: Loss estimates adjusted for air conditioning availability.
-
+    
+> [!NOTE]
+> The outputs are given as **absolute % productivity loss** where the "2020" value is actually the historical baseline (from ERA-5 data). It is likely that you will want to probive "delta" productivity losses to clients (i.e., 2020 = zero). To do this, simply subtract the 2020 columns from the future years. 
 
 # 📌 Overview
 - Purpose: Estimate productivity loss (%) due to heat exposure using pre-calculated global rasters.
@@ -60,12 +66,11 @@ This repository provides a sample interface for estimating annual productivity l
 
 # 🚀 How It Works
 1. Input: CSV with asset data (must include required columns).
-2. Processing:
+2. Processing
 3. Applies loss functions based on climate scenarios (e.g., SSP126, SSP245, SSP370, SSP585) and work intensity.
 4. Optionally generates plots for a subsample of assets.
 5. Output:
     - Two CSV files with productivity loss estimates (unscaled and AC-scaled).
-
 
 # ⚙️ Environment & Running the Script
 - AWS: Ensure AWS permissions are configured.
@@ -107,7 +112,7 @@ Note: If any packages (e.g., xarray) are missing after activation, you might nee
 
 # 📤 Output
 The model produces two primary CSV outputs:
-- `{project}_Productivity_Loss_UNSCALED.csv`: Productivity loss (%) without AC adjustments.
+- `{project}_Productivity_Loss_UNSCALED.csv`: Productivity loss (%) without AC adjustments (absolute annual % productivity losses where 2020=historical baseline and 2025-2100 are climate model projections).
 - `{project}_Productivity_Loss_AC_SCALED.csv`: Loss estimates scaled by regional air conditioning penetration.
 
 # 🤝 Support
